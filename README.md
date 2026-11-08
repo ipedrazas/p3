@@ -3,7 +3,7 @@
 A web app that generates printable PDF sewing patterns for a lined fabric plant pot cover with a folded cuff.
 Everything runs in the browser: no backend.
 
-**Use it: https://ipedrazas.github.io/p3/**
+**Use it: https://p3.andcake.dev/**
 
 ![The app: pot measurements on the left, a preview of each pattern page on the right](docs/screenshot.png)
 
@@ -60,6 +60,9 @@ npm run build     # type-check and build static site into dist/
 ```
 
 Every push to `main` is tested, built and deployed to GitHub Pages by `.github/workflows/deploy.yml`.
+The site is served at `p3.andcake.dev`:
+- The custom domain is set in the repo's Pages settings.
+- DNS is a `CNAME p3 → ipedrazas.github.io` record in Cloudflare. It must be set to "DNS only", or GitHub can't issue the HTTPS certificate.
 
 | File | Role |
 |---|---|
