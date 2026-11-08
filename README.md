@@ -3,6 +3,8 @@
 A web app that generates printable PDF sewing patterns for a lined fabric plant pot cover with a folded cuff.
 Everything runs in the browser: no backend.
 
+**Use it: https://ipedrazas.github.io/p3/**
+
 ![The app: pot measurements on the left, a preview of each pattern page on the right](docs/screenshot.png)
 
 ## Inputs
@@ -56,6 +58,8 @@ npm run dev       # http://localhost:5173
 npm test          # geometry + layout tests (vitest)
 npm run build     # type-check and build static site into dist/
 ```
+
+Every push to `main` is tested, built and deployed to GitHub Pages by `.github/workflows/deploy.yml`.
 
 | File | Role |
 |---|---|
