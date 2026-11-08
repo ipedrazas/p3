@@ -3,7 +3,7 @@ import { assemblySteps } from './instructions';
 import { layoutPieces, PAGE_SIZES, pageSize } from './layout';
 import { sectionSvg, sheetSvg } from './preview';
 
-const NUMERIC = ['top', 'base', 'height', 'fold', 'seam', 'ease', 'panels'] as const;
+const NUMERIC = ['top', 'base', 'height', 'fold', 'seam', 'ease', 'panels', 'printScale'] as const;
 
 const $ = <T extends Element>(sel: string) => document.querySelector<T>(sel)!;
 const form = $<HTMLFormElement>('#form');
@@ -87,7 +87,7 @@ function render() {
   toHash(p);
   const pattern = buildPattern(p);
   const page = pageSize(p.pageSize);
-  const layout = layoutPieces(pattern.pieces, page);
+  const layout = layoutPieces(pattern.pieces, page, 100 / p.printScale);
   const s = pattern.summary;
 
   const n = layout.pageCount;
@@ -145,7 +145,7 @@ $('#download').addEventListener('click', async () => {
     const { buildPdf } = await import('./pdf');
     const pattern = buildPattern(current);
     const page = pageSize(current.pageSize);
-    const doc = buildPdf(pattern, layoutPieces(pattern.pieces, page), page);
+    const doc = buildPdf(pattern, layoutPieces(pattern.pieces, page, 100 / current.printScale), page);
     const unit = current.measure === 'diameter' ? 'd' : 'r';
     doc.save(`plant-pot-cover-${unit}${current.top}-${current.base}-h${current.height}-${page.id}.pdf`);
   } finally {

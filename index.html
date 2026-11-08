@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Plant Pot Patterns</title>
     <meta name="description" content="Generate a printable PDF sewing pattern for a fabric plant pot cover." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#3d7a57" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <header class="site-header">
-      <h1>Plant Pot Patterns</h1>
+      <h1><img src="/logo.svg" alt="" width="40" height="40" /> Plant Pot Patterns</h1>
       <p>Measure your pot, get a printable sewing pattern for a lined fabric cover with a folded cuff.</p>
     </header>
 
@@ -68,6 +72,10 @@
           <label class="check">
             <input name="onFold" type="checkbox" />
             <span>Cut on fold<small>Print half of each piece, marked "place on fold". Uses fewer pages.</small></span>
+          </label>
+          <label class="field">
+            <span>Printer scale<small>If the 10 cm test ruler prints as 9.8 cm, enter 98</small></span>
+            <span class="input"><input name="printScale" type="number" step="0.1" min="80" max="120" /><em>%</em></span>
           </label>
         </fieldset>
 

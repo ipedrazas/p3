@@ -7,6 +7,9 @@ import { foldMark } from './marks';
 const path = (pts: Pt[], closed: boolean) =>
   pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join('') + (closed ? 'Z' : '');
 
+/** One typographic point in centimetres (the SVG user unit). */
+const PT_CM = 2.54 / 72;
+
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** One sheet (a piece, or all pieces) on its printer page(s). */
@@ -39,10 +42,13 @@ export function sheetSvg(sheet: Sheet, index: number): string {
           <text class="fold-label" transform="translate(${mark.textAt.x} ${mark.textAt.y}) rotate(${mark.textAngle})">PLACE ON FOLD</text>`
         : '';
       const closed = !piece.fold;
-      const small = Math.min(piece.width, piece.height) < 12 ? ' small' : '';
-      const label = `<g class="label${small}" transform="translate(${piece.labelAt.x} ${piece.labelAt.y}) rotate(${piece.rotation})">
-          <text class="piece-title" y="-0.3">${esc(piece.title)}</text>
-          ${piece.cutting.map((c, i) => `<text class="piece-cut" y="${0.45 + i * 0.6}">${esc(c)}</text>`).join('')}
+      // Same sizes as the PDF (see drawPiece), so the preview shows what prints.
+      const small = Math.min(piece.width, piece.height) < 12;
+      const pt = small ? 7.5 : 9;
+      const line = pt * PT_CM * 1.3;
+      const label = `<g class="label" style="--pt: ${(pt * PT_CM).toFixed(4)}px" transform="translate(${piece.labelAt.x} ${piece.labelAt.y}) rotate(${piece.rotation})">
+          <text class="piece-title" y="${-line * 0.6}">${esc(piece.title)}</text>
+          ${piece.cutting.map((c, i) => `<text class="piece-cut" y="${line * (0.6 + i)}">${esc(c)}</text>`).join('')}
         </g>`;
       return `<g transform="translate(${x} ${y})">
         <path class="cut-fill" d="${path(piece.cut, true)}"/>

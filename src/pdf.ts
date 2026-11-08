@@ -10,6 +10,7 @@ import { along, foldMark } from './marks';
 type ToMm = (p: Pt) => [number, number];
 
 const fmt = (v: number) => `${Math.round(v * 10) / 10} cm`;
+const fmtPct = (v: number) => `${Math.round(v * 10) / 10}%`;
 
 function polyline(doc: jsPDF, pts: Pt[], toMm: ToMm, closed: boolean) {
   if (pts.length < 2) return;
@@ -100,7 +101,8 @@ function centredText(
 ) {
   doc.setFont('helvetica', weight);
   doc.setFontSize(size);
-  const wCm = doc.getTextWidth(text) / 10;
+  const mmPerCm = toMm({ x: 1, y: 0 })[0] - toMm({ x: 0, y: 0 })[0];
+  const wCm = doc.getTextWidth(text) / mmPerCm;
   const [x, y] = toMm(along(at, angle, -wCm / 2, 0));
   doc.text(text, x, y, { angle: -angle });
 }
@@ -147,8 +149,12 @@ function infoPage(doc: jsPDF, pattern: Pattern, layout: Layout, page: PageSize) 
   doc.text('Plant pot cover pattern', left, y);
   y += 10;
 
+  // Test square and ruler are drawn with the same correction as the pattern.
+  const cal = layout.scale;
+  const corrected = Math.abs(cal - 1) > 1e-9;
+
   // 5 x 5 cm test square, top right.
-  const sq = 50;
+  const sq = 50 * cal;
   const sx = right - sq;
   const sy = y + 2;
   doc.setDrawColor(0);
@@ -170,19 +176,30 @@ function infoPage(doc: jsPDF, pattern: Pattern, layout: Layout, page: PageSize) 
   doc.setFontSize(9);
   doc.text('The ruler must measure 10 cm and the square 5 x 5 cm.', left, y);
   y += 4;
+  if (corrected) {
+    doc.text(
+      `Pre-scaled by ${fmtPct(cal * 100)} for a printer that prints at ${fmtPct(100 / cal)}.`,
+      left,
+      y,
+    );
+    y += 4;
+  } else {
+    doc.text('If they come out smaller, enter the measured size as "Printer scale" in the app.', left, y);
+    y += 4;
+  }
   // 10 cm ruler
   doc.setLineWidth(0.3);
   doc.setDrawColor(0);
-  doc.line(left, y + 4, left + 100, y + 4);
+  doc.line(left, y + 4, left + 100 * cal, y + 4);
   for (let i = 0; i <= 100; i++) {
     const tick = i % 10 === 0 ? 4 : i % 5 === 0 ? 2.5 : 1.2;
     doc.setLineWidth(i % 10 === 0 ? 0.3 : 0.15);
-    doc.line(left + i, y + 4, left + i, y + 4 - tick);
+    doc.line(left + i * cal, y + 4, left + i * cal, y + 4 - tick);
   }
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  for (let c = 0; c <= 10; c++) doc.text(String(c), left + c * 10, y + 8, { align: 'center' });
-  y += 16;
+  for (let c = 0; c <= 10; c++) doc.text(String(c), left + c * 10 * cal, y + 8, { align: 'center' });
+  y += 14;
 
   const unit = p.measure === 'diameter' ? 'diameter' : 'radius';
   const rows: [string, string][] = [
@@ -193,6 +210,7 @@ function infoPage(doc: jsPDF, pattern: Pattern, layout: Layout, page: PageSize) 
     ['Seam allowance', fmt(p.seam)],
     ['Ease', fmt(p.ease)],
     ['Cut on fold', p.onFold ? 'yes (half pieces)' : 'no (full pieces)'],
+    ['Printer scale', corrected ? `${fmtPct(p.printScale)} (pattern enlarged to compensate)` : '100%'],
     ['Construction', `${p.panels} side panel${p.panels === 1 ? '' : 's'}, ${p.circular ? 'round' : `${p.panels}-sided`} base`],
     ['Finished top circumference', fmt(s.topCircumference)],
     ['Finished base circumference', fmt(s.baseCircumference)],
@@ -360,16 +378,17 @@ function instructionsPage(doc: jsPDF, pattern: Pattern, page: PageSize) {
   doc.text('Notch: match notches when pinning', left + 25, y);
 }
 
-function sheetPages(doc: jsPDF, sheet: Sheet, page: PageSize, firstPage: number, totalPages: number) {
-  const m = PAGE_MARGIN * 10;
-  const tw = sheet.tileW * 10;
-  const th = sheet.tileH * 10;
+function sheetPages(doc: jsPDF, sheet: Sheet, page: PageSize, scale: number, firstPage: number, totalPages: number) {
+  const mm = 10 * scale; // paper millimetres per true centimetre
+  const m = PAGE_MARGIN * mm;
+  const tw = sheet.tileW * mm;
+  const th = sheet.tileH * mm;
   const pw = sheet.landscape ? page.h : page.w;
   const has = (c: number, r: number) => sheet.usedTiles.some((t) => t.col === c && t.row === r);
 
   sheet.usedTiles.forEach((t, i) => {
     doc.addPage([page.w, page.h], sheet.landscape ? 'landscape' : 'portrait');
-    const toMm: ToMm = (q) => [m + (q.x - t.x) * 10, m + (q.y - t.y) * 10];
+    const toMm: ToMm = (q) => [m + (q.x - t.x) * mm, m + (q.y - t.y) * mm];
 
     // Pattern content, clipped to the tile.
     doc.saveGraphicsState();
@@ -413,10 +432,10 @@ function sheetPages(doc: jsPDF, sheet: Sheet, page: PageSize, firstPage: number,
     doc.setTextColor(80);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.text(pageName(sheet, t), m, m - 3);
+    doc.text(pageName(sheet, t), m, m - 2.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
-    doc.text(`Page ${firstPage + i} of ${totalPages}  -  print at 100% scale`, pw - m, m - 3, { align: 'right' });
+    doc.text(`Page ${firstPage + i} of ${totalPages}  -  print at 100% scale`, pw - m, m - 2.5, { align: 'right' });
     doc.setTextColor(0);
   });
 }
@@ -424,11 +443,13 @@ function sheetPages(doc: jsPDF, sheet: Sheet, page: PageSize, firstPage: number,
 export function buildPdf(pattern: Pattern, layout: Layout, page: PageSize): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: [page.w, page.h], orientation: 'portrait' });
   doc.setProperties({ title: 'Plant pot cover pattern', creator: 'p3 - Plant Pot Patterns' });
+  // Ask viewers (Acrobat and others that honour it) to print at actual size.
+  doc.viewerPreferences({ PrintScaling: 'None' });
   infoPage(doc, pattern, layout, page);
   instructionsPage(doc, pattern, page);
   let n = 1;
   for (const sheet of layout.sheets) {
-    sheetPages(doc, sheet, page, n, layout.pageCount);
+    sheetPages(doc, sheet, page, layout.scale, n, layout.pageCount);
     n += sheet.usedTiles.length;
   }
   return doc;
