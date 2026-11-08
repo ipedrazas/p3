@@ -27,7 +27,7 @@ export const PAGE_SIZES: PageSize[] = [
 export const pageSize = (id: PageSizeId) => PAGE_SIZES.find((p) => p.id === id) ?? PAGE_SIZES[0];
 
 /** Non-printable border kept on every page, in cm. */
-export const PAGE_MARGIN = 1;
+export const PAGE_MARGIN = 0.8;
 /** Gap between pieces sharing a page, in cm. */
 const GAP = 1;
 const FIT_EPS = 1e-6;
@@ -64,6 +64,8 @@ export interface Sheet {
 export interface Layout {
   sheets: Sheet[];
   pageCount: number;
+  /** Factor applied when drawing on paper (100 / printer scale %). */
+  scale: number;
 }
 
 export const tileLabel = (col: number, row: number) => `${rowName(row)}${col + 1}`;
@@ -258,18 +260,24 @@ function bestTiled(piece: Piece, page: PageSize): Sheet {
   return best!;
 }
 
-export function layoutPieces(pieces: Piece[], page: PageSize): Layout {
+/**
+ * `scale` enlarges everything on paper to correct a printer that shrinks
+ * (e.g. 100/98). Layout works in true centimetres, so the usable paper is
+ * correspondingly smaller.
+ */
+export function layoutPieces(pieces: Piece[], paper: PageSize, scale = 1): Layout {
+  const page: PageSize = { ...paper, w: paper.w / scale, h: paper.h / scale };
   // Everything on one page, each piece in its best single-page rotation.
   const upright = pieces.map((p) => {
     const fit = fitOnePage(p, page);
     return fit ? rotatePiece(p, fit.deg) : p;
   });
   const together = singlePage(upright, page) ?? singlePage(pieces, page);
-  if (together && pieces.length > 1) return { sheets: [together], pageCount: 1 };
+  if (together && pieces.length > 1) return { sheets: [together], pageCount: 1, scale };
 
   const sheets = pieces.map((piece) => {
     const fit = fitOnePage(piece, page);
     return fit ? pieceSheet(rotatePiece(piece, fit.deg), page, fit.landscape) : bestTiled(piece, page);
   });
-  return { sheets, pageCount: sheets.reduce((n, s) => n + s.usedTiles.length, 0) };
+  return { sheets, pageCount: sheets.reduce((n, s) => n + s.usedTiles.length, 0), scale };
 }

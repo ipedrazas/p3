@@ -9,7 +9,7 @@ import {
   rotatePiece,
   validate,
 } from './geometry';
-import { type Layout, layoutPieces, pageSize } from './layout';
+import { type Layout, layoutPieces, PAGE_MARGIN, pageSize } from './layout';
 
 const piece = (p: Params, id: string) => buildPattern(p).pieces.find((x) => x.id === id)!;
 
@@ -153,6 +153,82 @@ describe('cut on fold', () => {
   }
 });
 
+describe('matching notches', () => {
+  const count = (p: Params, id: string) => piece(p, id).notches.length;
+
+  it('adds evenly spaced notches to round covers with fewer than 4 panels', () => {
+    // 2 panels: each edge split in 4 (3 notches per edge, top and bottom).
+    expect(count(DEFAULTS, 'side')).toBe(6);
+    expect(count(DEFAULTS, 'cuff')).toBe(6);
+    expect(count(DEFAULTS, 'base')).toBe(8);
+    // 1 panel: split in 8.
+    expect(count({ ...DEFAULTS, panels: 1 }, 'side')).toBe(14);
+    expect(count({ ...DEFAULTS, panels: 1 }, 'base')).toBe(8);
+    // 3 panels: split in 3.
+    expect(count({ ...DEFAULTS, panels: 3 }, 'side')).toBe(4);
+    expect(count({ ...DEFAULTS, panels: 3 }, 'base')).toBe(9);
+  });
+
+  it('keeps a single centre notch per edge otherwise', () => {
+    expect(count({ ...DEFAULTS, panels: 4 }, 'side')).toBe(2);
+    expect(count({ ...DEFAULTS, panels: 4 }, 'base')).toBe(8);
+    expect(count({ ...DEFAULTS, circular: false, panels: 3 }, 'side')).toBe(2);
+  });
+
+  it('places side and cuff top notches at the same distances along the edge', () => {
+    // Top-edge notches point down into the piece. Their spacing along the
+    // edge must be the same on both pieces (a quarter of the panel's top edge).
+    const spacing = (id: string) => {
+      const pc = piece(DEFAULTS, id);
+      const top = pc.notches.filter(([a, b]) => b.y > a.y).map(([a]) => a).sort((p, q) => p.x - q.x);
+      return top.slice(1).map((q, i) => Math.hypot(q.x - top[i].x, q.y - top[i].y));
+    };
+    const side = spacing('side');
+    const cuff = spacing('cuff');
+    expect(side).toHaveLength(2);
+    // Measured on the cut line (1.5 cm out from the stitch line), so allow a few mm.
+    side.forEach((d, i) => expect(Math.abs(cuff[i] - d)).toBeLessThan(0.3));
+    expect(side[0]).toBeCloseTo(piece(DEFAULTS, 'side').edges.top / 4, 0);
+  });
+
+  it('notches start on the cut line and point inwards', () => {
+    for (const p of [DEFAULTS, { ...DEFAULTS, panels: 1 }, { ...DEFAULTS, top: 20, base: 20 }]) {
+      for (const pc of buildPattern(p).pieces) {
+        for (const [a, b] of pc.notches) {
+          expect(minDistToPolygon(a, pc.cut)).toBeLessThan(0.02);
+          expect(minDistToPolygon(b, pc.stitch)).toBeLessThan(minDistToPolygon(a, pc.stitch));
+        }
+      }
+    }
+  });
+
+  it('keeps the off-centre notches on half pieces', () => {
+    // 2 panels on the fold: centre notches go, one notch each side of it stays per edge.
+    expect(count({ ...DEFAULTS, onFold: true }, 'side')).toBe(2);
+    expect(count({ ...DEFAULTS, onFold: true }, 'base')).toBe(3);
+  });
+});
+
+describe('printer scale', () => {
+  it('is validated', () => {
+    expect(validate({ ...DEFAULTS, printScale: 50 }).map((e) => e.field)).toEqual(['printScale']);
+    expect(validate({ ...DEFAULTS, printScale: 98 })).toEqual([]);
+  });
+
+  it('shrinks the usable page area in true centimetres', () => {
+    const pieces = buildPattern({ ...DEFAULTS, onFold: true }).pieces;
+    const plain = layoutPieces(pieces, pageSize('A4'));
+    const scaled = layoutPieces(pieces, pageSize('A4'), 100 / 98);
+    expect(scaled.scale).toBeCloseTo(100 / 98, 9);
+    const sh = scaled.sheets[0];
+    const ref = plain.sheets[0];
+    const portrait = (s: typeof sh) => (s.landscape ? s.tileH : s.tileW);
+    expect(portrait(sh)).toBeCloseTo(21 / (100 / 98) - 2 * PAGE_MARGIN, 6);
+    expect(portrait(ref)).toBeCloseTo(21 - 2 * PAGE_MARGIN, 6);
+    expectCovered(scaled, pieces.length);
+  });
+});
+
 describe('rotatePiece', () => {
   it('keeps edge lengths and swaps width and height at 90 degrees', () => {
     const side = piece(DEFAULTS, 'side');
@@ -226,5 +302,12 @@ describe('layout', () => {
         expect(pl.piece.rotation).toBeLessThanOrEqual(90);
       }
     }
+  });
+});
+
+describe('default pattern with a 98% printer', () => {
+  it('still fits each half piece on its own A4 page', () => {
+    const l = layoutPieces(buildPattern({ ...DEFAULTS, onFold: true }).pieces, pageSize('A4'), 100 / 98);
+    expect(l.pageCount).toBe(3);
   });
 });

@@ -26,6 +26,11 @@ export interface Params {
   /** Print only half of each (symmetric) piece, to be cut on the fabric fold. */
   onFold: boolean;
   pageSize: PageSizeId;
+  /**
+   * What the printer actually produces, in percent: if the 10 cm ruler
+   * prints as 9.8 cm, this is 98 and the pattern is enlarged to compensate.
+   */
+  printScale: number;
 }
 
 export const DEFAULTS: Params = {
@@ -39,6 +44,7 @@ export const DEFAULTS: Params = {
   circular: true,
   measure: 'diameter',
   onFold: false,
+  printScale: 100,
   pageSize: 'A4',
 };
 
@@ -114,6 +120,7 @@ export function validate(p: Params): FieldError[] {
   check('fold', 'Fold', (v) => v >= 0 && !(v >= p.height), 'Fold must be at least 0 and less than the height.');
   check('seam', 'Seam allowance', (v) => v >= 0 && v <= 5, 'Seam allowance must be between 0 and 5 cm.');
   check('ease', 'Ease', (v) => v >= 0 && v <= 20, 'Ease must be between 0 and 20 cm.');
+  check('printScale', 'Printer scale', (v) => v >= 80 && v <= 120, 'Printer scale must be between 80 and 120%.');
   check(
     'panels',
     'Side panels',
@@ -234,8 +241,11 @@ function coneBand(
   zTo: number,
   seam: number,
   guideZ: { z: number; label: string }[] = [],
+  divisions = 2,
 ): Shape {
   const r = (z: number) => rBot + ((rTop - rBot) * z) / h;
+  // Matching notches split each edge into `divisions` equal parts.
+  const steps = Array.from({ length: divisions - 1 }, (_, i) => (i + 1) / divisions);
   const dr = rTop - rBot;
   const nl = notchLen(seam);
 
@@ -248,7 +258,10 @@ function coneBand(
       stitch,
       cut: offsetConvex(stitch, seam),
       guides: guideZ.map((g) => ({ label: g.label, pts: [pt(-hw, zTo - g.z), pt(hw, zTo - g.z)] })),
-      notches: [notch(pt(0, -seam), pt(0, 1), nl), notch(pt(0, H + seam), pt(0, -1), nl)],
+      notches: steps.flatMap((f) => {
+        const x = -hw + 2 * hw * f;
+        return [notch(pt(x, -seam), pt(0, 1), nl), notch(pt(x, H + seam), pt(0, -1), nl)];
+      }),
       grain: [pt(-hw * 0.45, H * 0.15), pt(-hw * 0.45, H * 0.85)],
       labelAt: pt(hw * 0.35, H / 2),
       edges: { top: 2 * hw, bottom: 2 * hw, side: H },
@@ -286,7 +299,12 @@ function coneBand(
     stitch,
     cut,
     guides: guideZ.map((g) => ({ label: g.label, pts: arc(L(g.z), -alpha, alpha) })),
-    notches: [notch(pt(0, rco), pt(0, -1), nl), notch(pt(0, rci), pt(0, 1), nl)],
+    notches: steps.flatMap((f) => {
+      const phi = -alpha + 2 * alpha * f;
+      const out = polar(rco, phi);
+      const inn = polar(rci, phi);
+      return [notch(out, pt(-out.x, -out.y), nl), notch(inn, inn, nl)];
+    }),
     grain: [pt(-halfMid * 0.45, ri + (ro - ri) * 0.15), pt(-halfMid * 0.45, ri + (ro - ri) * 0.85)],
     labelAt: pt(halfMid * 0.35, mid),
     edges: {
@@ -309,8 +327,10 @@ function polygonBand(
   zTo: number,
   seam: number,
   guideZ: { z: number; label: string }[] = [],
+  divisions = 2,
 ): Shape {
   const tan = Math.tan(Math.PI / n);
+  const steps = Array.from({ length: divisions - 1 }, (_, i) => (i + 1) / divisions);
   const a = (z: number) => aBot + ((aTop - aBot) * z) / h;
   const hw = (z: number) => a(z) * tan;
   const k = Math.hypot(h, aTop - aBot) / h; // face slant per unit height
@@ -323,7 +343,10 @@ function polygonBand(
     stitch,
     cut: offsetConvex(stitch, seam),
     guides: guideZ.map((g) => ({ label: g.label, pts: [pt(-hw(g.z), y(g.z)), pt(hw(g.z), y(g.z))] })),
-    notches: [notch(pt(0, -seam), pt(0, 1), nl), notch(pt(0, H + seam), pt(0, -1), nl)],
+    notches: steps.flatMap((f) => [
+      notch(pt(-hw(zTo) + 2 * hw(zTo) * f, -seam), pt(0, 1), nl),
+      notch(pt(-hw(zFrom) + 2 * hw(zFrom) * f, H + seam), pt(0, -1), nl),
+    ]),
     grain: [pt(-hwMid * 0.45, H * 0.15), pt(-hwMid * 0.45, H * 0.85)],
     labelAt: pt(hwMid * 0.35, H / 2),
     edges: {
@@ -334,12 +357,12 @@ function polygonBand(
   };
 }
 
-function circleBase(R: number, n: number, seam: number): Shape {
+function circleBase(R: number, n: number, seam: number, divisions = 2): Shape {
   const stitch = arc(R, 0, TAU).slice(0, -1);
   const cut = arc(R + seam, 0, TAU).slice(0, -1);
   const nl = notchLen(seam);
-  // Notch at every side seam and half way between them.
-  const marks = Math.max(2, 2 * n);
+  // Notch at every side seam and at the panels' matching notches.
+  const marks = Math.max(2, divisions * n);
   const notches: Seg[] = [];
   for (let i = 0; i < marks; i++) {
     const phi = Math.PI + (TAU * i) / marks; // first notch at the top
@@ -583,6 +606,9 @@ export function buildPattern(p: Params): Pattern {
   const pieces: Piece[] = [];
 
   const band = p.circular ? coneBand : polygonBand;
+  // Few round panels make long curved seams: add extra matching notches so
+  // there is one roughly every eighth of the way round.
+  const divisions = p.circular && n < 4 ? Math.ceil(8 / n) : 2;
   const fold = p.onFold;
   const cut = (count: number, fabric: string) => `Cut ${count}${fold ? ' on fold' : ''} in ${fabric}`;
   const guides = f > 0 ? [{ z: cuffZ, label: 'cuff edge' }] : [];
@@ -592,7 +618,7 @@ export function buildPattern(p: Params): Pattern {
       'side',
       'Side panel',
       [cut(n, 'outer fabric'), cut(n, 'lining')],
-      band(rTop, rBot, h, n, 0, h, sa, guides),
+      band(rTop, rBot, h, n, 0, h, sa, guides, divisions),
       fold,
     ),
   );
@@ -606,7 +632,7 @@ export function buildPattern(p: Params): Pattern {
         'cuff',
         'Cuff panel',
         [cut(n, 'cuff fabric'), cut(n, 'cuff lining')],
-        band(rTop, rCuffBot, f, n, 0, f, sa),
+        band(rTop, rCuffBot, f, n, 0, f, sa, [], divisions),
         fold,
       ),
     );
@@ -617,7 +643,7 @@ export function buildPattern(p: Params): Pattern {
       'base',
       'Base',
       [cut(1, 'outer fabric'), cut(1, 'lining')],
-      p.circular ? circleBase(rBot, n, sa) : polygonBase(rBot, n, sa),
+      p.circular ? circleBase(rBot, n, sa, divisions) : polygonBase(rBot, n, sa),
       fold,
     ),
   );
