@@ -1,0 +1,22 @@
+{
+  "name": "p3",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plant Pot Patterns - generate printable PDF sewing patterns for plant pot covers",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jspdf": "^4.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}
