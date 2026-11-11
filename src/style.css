@@ -345,6 +345,18 @@ button.ghost {
   font-weight: 700;
   fill: #8a8577;
 }
+.test-square rect {
+  fill: none;
+  stroke: #1f2a24;
+  stroke-width: 0.08;
+}
+.test-square text {
+  font-size: 0.42px; /* 12 pt, as in the PDF */
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  fill: #1f2a24;
+}
 .cut-fill {
   fill: rgba(61, 122, 87, 0.08);
   stroke: none;
@@ -423,4 +435,64 @@ button.ghost {
 }
 .howto li {
   margin: 6px 0;
+}
+.figs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 8px 0 4px;
+}
+.fig {
+  margin: 0;
+  width: 170px;
+}
+.fig svg {
+  display: block;
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.fig figcaption {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 4px;
+  text-align: center;
+}
+.fig-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+.fig-outer {
+  fill: #b9d3c2;
+  stroke: #1f2a24;
+  stroke-width: 0.2;
+}
+.fig-lining {
+  fill: #ffffff;
+  stroke: #1f2a24;
+  stroke-width: 0.2;
+}
+.fig-right {
+  fill: none;
+  stroke: #1f2a24;
+  stroke-width: 0.7;
+}
+.fig-stitch,
+.fig-baste {
+  fill: none;
+  stroke: #b3261e;
+  stroke-width: 0.3;
+}
+.fig-stitch {
+  stroke-dasharray: 1 0.6;
+}
+.fig-baste {
+  stroke-dasharray: 2.4 1.2;
+}
+.fig-label {
+  font-size: 2.6px;
+  fill: #1f2a24;
+  dominant-baseline: middle;
 }

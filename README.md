@@ -41,10 +41,11 @@ You cut each piece in outer fabric and again in lining. Every piece includes the
 The PDF contains:
 
 1. An info page with a 10 cm test ruler and a 5 × 5 cm test square, your measurements, the cutting list and a page map.
-2. Sewing instructions and a legend.
+2. Sewing instructions and a legend. Steps from the cuff onwards have diagrams: cut-away views of one side of the cover that show which way each layer faces.
 3. Pattern pages printed at 100% scale. Each piece gets its own page, so nothing needs taping. Pieces are turned to whatever angle and page orientation lets them fit, and their labels turn with them.
    - If all pieces fit on one sheet (A0), they share it.
    - A piece too big for any page is split over its own pages only. Those pages have labels like `Side panel A2` and half-diamond marks for joining, and the piece is shifted so its label stays clear of the joins.
+   - The 5 × 5 cm test square is repeated in a free corner of the first pattern page that has one, so you can check the scale without printing the info page.
 
 ## Printing at the right size
 
@@ -72,4 +73,5 @@ The site is served at `p3.andcake.dev`:
 | `src/pdf.ts` | Draws the vector PDF with jsPDF. It is lazy-loaded when you click Download. |
 | `src/preview.ts` | SVG previews of the sheet and a cross-section of the pot. |
 | `src/instructions.ts` | Sewing steps, shared by the UI and the PDF. |
+| `src/figures.ts` | Step diagrams as simple shapes, drawn as SVG in the UI and as vectors in the PDF. |
 | `src/main.ts` | Form handling and URL state. |

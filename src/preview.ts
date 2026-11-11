@@ -1,7 +1,7 @@
 // SVG previews for the browser. Units in the SVG user space are centimetres.
 
 import type { Params, Pattern, Pt } from './geometry';
-import type { Sheet } from './layout';
+import { type Sheet, TEST_SQUARE } from './layout';
 import { foldMark } from './marks';
 
 const path = (pts: Pt[], closed: boolean) =>
@@ -60,10 +60,15 @@ export function sheetSvg(sheet: Sheet, index: number): string {
       </g>`;
     })
     .join('');
+  const sq = sheet.testSquare;
+  const square = sq
+    ? `<g class="test-square"><rect x="${sq.x}" y="${sq.y}" width="${TEST_SQUARE}" height="${TEST_SQUARE}"/>
+        <text x="${sq.x + TEST_SQUARE / 2}" y="${sq.y + TEST_SQUARE / 2}">5 × 5 cm</text></g>`
+    : '';
   return `<svg viewBox="-0.2 -0.2 ${W + 0.4} ${H + 0.4}" role="img" aria-label="${esc(sheet.title)} on ${sheet.usedTiles.length} printed page(s)">
     <defs><marker id="${arrow}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
       <path d="M0 0L10 5L0 10" class="arrowhead"/></marker></defs>
-    ${tiles}${pieces}</svg>`;
+    ${tiles}${square}${pieces}</svg>`;
 }
 
 /** A cross-section of the pot (grey) and the cover around it. */
