@@ -3,8 +3,9 @@
 
 import { jsPDF } from 'jspdf';
 import type { Pattern, Piece, Pt } from './geometry';
+import { type Figure, FIGURE_NOTE, type FigureStyle } from './figures';
 import { assemblySteps } from './instructions';
-import { type Layout, type PageSize, PAGE_MARGIN, pageName, type Sheet, tileLabel } from './layout';
+import { type Layout, type PageSize, PAGE_MARGIN, pageName, type Sheet, TEST_SQUARE, tileLabel } from './layout';
 import { along, foldMark } from './marks';
 
 type ToMm = (p: Pt) => [number, number];
@@ -12,11 +13,11 @@ type ToMm = (p: Pt) => [number, number];
 const fmt = (v: number) => `${Math.round(v * 10) / 10} cm`;
 const fmtPct = (v: number) => `${Math.round(v * 10) / 10}%`;
 
-function polyline(doc: jsPDF, pts: Pt[], toMm: ToMm, closed: boolean) {
+function polyline(doc: jsPDF, pts: Pt[], toMm: ToMm, closed: boolean, style: 'S' | 'FD' = 'S') {
   if (pts.length < 2) return;
   const m = pts.map(toMm);
   const deltas = m.slice(1).map((p, i) => [p[0] - m[i][0], p[1] - m[i][1]]);
-  doc.lines(deltas, m[0][0], m[0][1], [1, 1], 'S', closed);
+  doc.lines(deltas, m[0][0], m[0][1], [1, 1], style, closed);
 }
 
 function arrowHead(doc: jsPDF, tip: [number, number], from: [number, number], size: number) {
@@ -308,6 +309,46 @@ function infoPage(doc: jsPDF, pattern: Pattern, layout: Layout, page: PageSize) 
   }
 }
 
+/** Line and fill for each figure style: [fill RGB or null, stroke RGB, width, dash]. */
+const FIG_STYLE: Record<FigureStyle, [number[] | null, number[], number, number[]]> = {
+  outer: [[185, 211, 194], [31, 42, 36], 0.2, []],
+  lining: [[255, 255, 255], [31, 42, 36], 0.2, []],
+  right: [null, [31, 42, 36], 0.7, []],
+  stitch: [null, [179, 38, 30], 0.3, [1, 0.6]],
+  baste: [null, [179, 38, 30], 0.3, [2.4, 1.2]],
+};
+/** Room under a figure for a caption of up to two lines. */
+const FIG_CAPTION = 10;
+
+/** Draw a step illustration with its top-left corner at (x0, y0), 1:1 in mm. */
+function drawFigure(doc: jsPDF, f: Figure, x0: number, y0: number) {
+  doc.setDrawColor(200);
+  doc.setLineWidth(0.2);
+  doc.setLineDashPattern([], 0);
+  doc.roundedRect(x0, y0, f.w, f.h, 2, 2, 'S');
+  for (const s of f.shapes) {
+    const [fill, stroke, w, dash] = FIG_STYLE[s.style];
+    doc.setDrawColor(stroke[0], stroke[1], stroke[2]);
+    if (fill) doc.setFillColor(fill[0], fill[1], fill[2]);
+    doc.setLineWidth(w);
+    doc.setLineDashPattern(dash, 0);
+    polyline(doc, s.pts, (p) => [x0 + p.x, y0 + p.y], !!s.closed, fill ? 'FD' : 'S');
+  }
+  doc.setLineDashPattern([], 0);
+  doc.setDrawColor(0);
+  doc.setTextColor(31, 42, 36);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.4);
+  for (const l of f.labels) {
+    const align = l.anchor === 'start' ? 'left' : l.anchor === 'end' ? 'right' : 'center';
+    doc.text(l.text, x0 + l.at.x, y0 + l.at.y, { align, baseline: 'middle' });
+  }
+  doc.setFontSize(7.5);
+  doc.setTextColor(90);
+  doc.text(doc.splitTextToSize(f.caption, f.w), x0 + f.w / 2, y0 + f.h + 4, { align: 'center' });
+  doc.setTextColor(0);
+}
+
 function instructionsPage(doc: jsPDF, pattern: Pattern, page: PageSize) {
   doc.addPage([page.w, page.h], 'portrait');
   const left = 15;
@@ -318,10 +359,16 @@ function instructionsPage(doc: jsPDF, pattern: Pattern, page: PageSize) {
   doc.setFontSize(16);
   doc.text('Sewing instructions', left, y);
   y += 10;
-  doc.setFontSize(10);
+  let noted = false;
   assemblySteps(pattern).forEach((step, i) => {
-    const lines = doc.splitTextToSize(step, width - 8);
-    if (y + lines.length * 5 > page.h - 15) {
+    doc.setFontSize(10);
+    const lines = doc.splitTextToSize(step.text, width - 8);
+    const figs = step.figures ?? [];
+    const note = figs.length && !noted ? doc.setFontSize(8).splitTextToSize(FIGURE_NOTE, width - 8) : [];
+    doc.setFontSize(10);
+    // Keep a step's text and its illustrations on the same page.
+    const figH = figs.length ? Math.max(...figs.map((f) => f.h)) + FIG_CAPTION + 3 + note.length * 3.5 : 0;
+    if (y + lines.length * 5 + figH > page.h - 15) {
       doc.addPage([page.w, page.h], 'portrait');
       y = 20;
     }
@@ -330,8 +377,30 @@ function instructionsPage(doc: jsPDF, pattern: Pattern, page: PageSize) {
     doc.setFont('helvetica', 'normal');
     doc.text(lines, left + 8, y);
     y += lines.length * 5 + 3;
+    if (figs.length) {
+      let x = left + 8;
+      for (const f of figs) {
+        drawFigure(doc, f, x, y - 2);
+        x += f.w + 6;
+      }
+      y += Math.max(...figs.map((f) => f.h)) + FIG_CAPTION;
+      if (note.length) {
+        doc.setFontSize(8);
+        doc.setTextColor(90);
+        doc.text(note, left + 8, y);
+        doc.setTextColor(0);
+        y += note.length * 3.5;
+        noted = true;
+      }
+      y += 3;
+    }
   });
 
+  // The legend needs about 45 mm.
+  if (y + 51 > page.h - 15) {
+    doc.addPage([page.w, page.h], 'portrait');
+    y = 14;
+  }
   y += 6;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -399,6 +468,24 @@ function sheetPages(doc: jsPDF, sheet: Sheet, page: PageSize, scale: number, fir
       drawPiece(doc, pl.piece, (q) => toMm({ x: q.x + pl.x, y: q.y + pl.y }));
     }
     doc.restoreGraphicsState();
+
+    // Test square, so a page can be checked without printing the info page.
+    const sq = sheet.testSquare;
+    if (sq && sq.x >= t.x && sq.x < t.x + sheet.tileW && sq.y >= t.y && sq.y < t.y + sheet.tileH) {
+      const [sx, sy] = toMm(sq);
+      const side = TEST_SQUARE * mm;
+      doc.setDrawColor(0);
+      doc.setTextColor(0);
+      doc.setLineWidth(0.3);
+      doc.setLineDashPattern([], 0);
+      doc.rect(sx, sy, side, side, 'S');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('5 x 5 cm', sx + side / 2, sy + side / 2 - 1, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('test square', sx + side / 2, sy + side / 2 + 4, { align: 'center' });
+    }
 
     // Frame.
     doc.setLineDashPattern([], 0);

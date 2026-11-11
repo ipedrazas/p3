@@ -1,4 +1,5 @@
 import { buildPattern, DEFAULTS, type PageSizeId, type Params, validate } from './geometry';
+import { FIGURE_NOTE, figureSvg } from './figures';
 import { assemblySteps } from './instructions';
 import { layoutPieces, PAGE_SIZES, pageSize } from './layout';
 import { sectionSvg, sheetSvg } from './preview';
@@ -95,7 +96,7 @@ function render() {
   $('#pages').textContent =
     `${n} pattern page${n === 1 ? '' : 's'} on ${page.id}` +
     (tiled ? ' (some pieces span several pages)' : ', no taping needed') +
-    ', plus 2 pages of instructions.';
+    ', plus an info page and the sewing instructions.';
   const stats: [string, string][] = [
     ['Top circumference', cm(s.topCircumference)],
     ['Base circumference', cm(s.baseCircumference)],
@@ -111,7 +112,16 @@ function render() {
     )
     .join('');
   $('#section').innerHTML = sectionSvg(p, pattern);
-  $('#steps').innerHTML = assemblySteps(pattern).map((t) => `<li>${t}</li>`).join('');
+  let noted = false;
+  $('#steps').innerHTML = assemblySteps(pattern)
+    .map((st) => {
+      if (!st.figures) return `<li>${st.text}</li>`;
+      // Explain the drawing convention once, under the first illustrations.
+      const note = noted ? '' : `<p class="fig-note">${FIGURE_NOTE}</p>`;
+      noted = true;
+      return `<li>${st.text}<div class="figs">${st.figures.map(figureSvg).join('')}</div>${note}</li>`;
+    })
+    .join('');
 }
 
 // Switching radius/diameter keeps the same pot by converting the values.

@@ -59,6 +59,8 @@ export interface Sheet {
   tileH: number;
   tiles: Tile[];
   usedTiles: Tile[];
+  /** Top-left corner of the 5 x 5 cm test square, in sheet coordinates, if this sheet carries it. */
+  testSquare?: Pt;
 }
 
 export interface Layout {
@@ -260,6 +262,48 @@ function bestTiled(piece: Piece, page: PageSize): Sheet {
   return best!;
 }
 
+// --- Test square ---------------------------------------------------------------
+
+/** Side of the test square printed on a pattern page, in cm. */
+export const TEST_SQUARE = 5;
+/** Clear space kept between the test square and any piece, in cm. */
+const SQUARE_CLEARANCE = 0.5;
+/** Inset of the test square from the page's printable corner, in cm. */
+const SQUARE_INSET = 0.3;
+
+/** Where a test square fits in a free corner of one of the sheet's pages, if anywhere. */
+function freeCorner(sheet: Sheet): Pt | undefined {
+  const shapes = sheet.placed.map((pl) => densify(pl.piece.cut.map((p) => ({ x: p.x + pl.x, y: p.y + pl.y })), 0.25));
+  const s = TEST_SQUARE;
+  const c = SQUARE_CLEARANCE;
+  for (const t of sheet.usedTiles) {
+    const near = SQUARE_INSET;
+    const farX = sheet.tileW - SQUARE_INSET - s;
+    const farY = sheet.tileH - SQUARE_INSET - s;
+    // Bottom corners first: pieces are centred, and the page name is at the top.
+    const corners: [number, number][] = [[farX, farY], [near, farY], [farX, near], [near, near]];
+    for (const [dx, dy] of corners) {
+      const x = t.x + dx;
+      const y = t.y + dy;
+      const hits = (p: Pt) => p.x >= x - c && p.x <= x + s + c && p.y >= y - c && p.y <= y + s + c;
+      const box = [{ x, y }, { x: x + s, y }, { x, y: y + s }, { x: x + s, y: y + s }];
+      if (!shapes.some((poly) => poly.some(hits) || box.some((b) => pointInPolygon(b, poly)))) return { x, y };
+    }
+  }
+  return undefined;
+}
+
+/** Put the test square on the first pattern page with a free corner. */
+function placeTestSquare(sheets: Sheet[]) {
+  for (const sheet of sheets) {
+    const at = freeCorner(sheet);
+    if (at) {
+      sheet.testSquare = at;
+      return;
+    }
+  }
+}
+
 /**
  * `scale` enlarges everything on paper to correct a printer that shrinks
  * (e.g. 100/98). Layout works in true centimetres, so the usable paper is
@@ -273,11 +317,15 @@ export function layoutPieces(pieces: Piece[], paper: PageSize, scale = 1): Layou
     return fit ? rotatePiece(p, fit.deg) : p;
   });
   const together = singlePage(upright, page) ?? singlePage(pieces, page);
-  if (together && pieces.length > 1) return { sheets: [together], pageCount: 1, scale };
+  if (together && pieces.length > 1) {
+    placeTestSquare([together]);
+    return { sheets: [together], pageCount: 1, scale };
+  }
 
   const sheets = pieces.map((piece) => {
     const fit = fitOnePage(piece, page);
     return fit ? pieceSheet(rotatePiece(piece, fit.deg), page, fit.landscape) : bestTiled(piece, page);
   });
+  placeTestSquare(sheets);
   return { sheets, pageCount: sheets.reduce((n, s) => n + s.usedTiles.length, 0), scale };
 }

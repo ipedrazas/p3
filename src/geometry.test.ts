@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { assemblySteps } from './instructions';
 import {
   buildPattern,
   CUFF_TURN_OF_CLOTH,
@@ -9,7 +10,7 @@ import {
   rotatePiece,
   validate,
 } from './geometry';
-import { type Layout, layoutPieces, PAGE_MARGIN, pageSize } from './layout';
+import { type Layout, layoutPieces, PAGE_MARGIN, pageSize, TEST_SQUARE } from './layout';
 
 const piece = (p: Params, id: string) => buildPattern(p).pieces.find((x) => x.id === id)!;
 
@@ -309,5 +310,58 @@ describe('default pattern with a 98% printer', () => {
   it('still fits each half piece on its own A4 page', () => {
     const l = layoutPieces(buildPattern({ ...DEFAULTS, onFold: true }).pieces, pageSize('A4'), 100 / 98);
     expect(l.pageCount).toBe(3);
+  });
+});
+
+describe('test square on a pattern page', () => {
+  const corners = (l: Layout) => l.sheets.filter((s) => s.testSquare);
+
+  it('appears on exactly one sheet, inside a printed page, clear of every piece', () => {
+    for (const id of ['A4', 'A3', 'Letter', 'Legal', 'A0'] as const) {
+      for (const onFold of [false, true]) {
+        for (const circular of [true, false]) {
+          for (const panels of [1, 2, 3, 6]) {
+            if (!circular && panels < 3) continue;
+            const l = layoutPieces(buildPattern({ ...DEFAULTS, onFold, circular, panels }).pieces, pageSize(id));
+            const withSquare = corners(l);
+            expect(withSquare).toHaveLength(1);
+            const sheet = withSquare[0];
+            const sq = sheet.testSquare!;
+            const tile = sheet.usedTiles.find(
+              (t) => sq.x >= t.x && sq.x + TEST_SQUARE <= t.x + sheet.tileW && sq.y >= t.y && sq.y + TEST_SQUARE <= t.y + sheet.tileH,
+            );
+            expect(tile).toBeDefined();
+            for (const pl of sheet.placed) {
+              for (const p of pl.piece.cut) {
+                const x = p.x + pl.x;
+                const y = p.y + pl.y;
+                expect(x >= sq.x && x <= sq.x + TEST_SQUARE && y >= sq.y && y <= sq.y + TEST_SQUARE).toBe(false);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('step illustrations', () => {
+  it('include the cuff steps only when there is a cuff', () => {
+    const figs = (fold: number) => assemblySteps(buildPattern({ ...DEFAULTS, fold })).flatMap((s) => s.figures ?? []);
+    expect(figs(0)).toHaveLength(2);
+    expect(figs(5)).toHaveLength(5);
+  });
+
+  it('stay inside their frame, even for very short or very deep cuffs', () => {
+    for (const fold of [0, 1, 5, 15]) {
+      for (const f of assemblySteps(buildPattern({ ...DEFAULTS, fold })).flatMap((s) => s.figures ?? [])) {
+        for (const p of [...f.shapes.flatMap((s) => s.pts), ...f.labels.map((l) => l.at)]) {
+          expect(p.x).toBeGreaterThanOrEqual(0);
+          expect(p.x).toBeLessThanOrEqual(f.w);
+          expect(p.y).toBeGreaterThanOrEqual(0);
+          expect(p.y).toBeLessThanOrEqual(f.h);
+        }
+      }
+    }
   });
 });
