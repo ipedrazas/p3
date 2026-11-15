@@ -61,6 +61,8 @@ export interface Piece {
   title: string;
   /** Cutting instructions, one line each. */
   cutting: string[];
+  /** Pot size the pattern was made for, to tell printed pieces of different patterns apart. */
+  size: string;
   /**
    * Cut line, as a polygon. When `fold` is set, the closing segment (last
    * point back to first) is the fold edge and is not drawn as a cut line.
@@ -515,7 +517,13 @@ function halve(s: Shape): FoldedShape {
   };
 }
 
-function finish(id: string, title: string, cutting: string[], shape: Shape, onFold: boolean): Piece {
+/** Short pot size, printed on every piece: "Pot Ø 15 / 12, H 14 cm" (top / base, height). */
+export function sizeLabel(p: Pick<Params, 'top' | 'base' | 'height' | 'measure'>): string {
+  const r = (v: number) => String(Math.round(v * 10) / 10);
+  return `Pot ${p.measure === 'diameter' ? 'Ø' : 'R'} ${r(p.top)} / ${r(p.base)}, H ${r(p.height)} cm`;
+}
+
+function finish(id: string, title: string, cutting: string[], size: string, shape: Shape, onFold: boolean): Piece {
   const s: FoldedShape = onFold ? halve(shape) : shape;
   const b = bbox([...s.cut, ...s.notches.flat()]);
   const f = (p: Pt) => pt(p.x - b.minX, p.y - b.minY);
@@ -523,6 +531,7 @@ function finish(id: string, title: string, cutting: string[], shape: Shape, onFo
     id,
     title,
     cutting,
+    size,
     cut: s.cut.map(f),
     stitch: s.stitch.map(f),
     guides: s.guides.map((g) => ({ ...g, pts: g.pts.map(f) })),
@@ -611,13 +620,15 @@ export function buildPattern(p: Params): Pattern {
   const divisions = p.circular && n < 4 ? Math.ceil(8 / n) : 2;
   const fold = p.onFold;
   const cut = (count: number, fabric: string) => `Cut ${count}${fold ? ' on fold' : ''} in ${fabric}`;
+  const size = sizeLabel(p);
   const guides = f > 0 ? [{ z: cuffZ, label: 'cuff edge' }] : [];
 
   pieces.push(
     finish(
       'side',
       'Side panel',
-      [cut(n, 'outer fabric'), cut(n, 'lining')],
+      [cut(n, 'outer fabric'), cut(n, 'lining'), cut(n, 'interfacing')],
+      size,
       band(rTop, rBot, h, n, 0, h, sa, guides, divisions),
       fold,
     ),
@@ -632,6 +643,7 @@ export function buildPattern(p: Params): Pattern {
         'cuff',
         'Cuff panel',
         [cut(n, 'cuff fabric'), cut(n, 'cuff lining')],
+        size,
         band(rTop, rCuffBot, f, n, 0, f, sa, [], divisions),
         fold,
       ),
@@ -642,7 +654,8 @@ export function buildPattern(p: Params): Pattern {
     finish(
       'base',
       'Base',
-      [cut(1, 'outer fabric'), cut(1, 'lining')],
+      [cut(1, 'outer fabric'), cut(1, 'lining'), cut(1, 'interfacing')],
+      size,
       p.circular ? circleBase(rBot, n, sa, divisions) : polygonBase(rBot, n, sa),
       fold,
     ),

@@ -48,7 +48,7 @@ export function sheetSvg(sheet: Sheet, index: number): string {
       const line = pt * PT_CM * 1.3;
       const label = `<g class="label" style="--pt: ${(pt * PT_CM).toFixed(4)}px" transform="translate(${piece.labelAt.x} ${piece.labelAt.y}) rotate(${piece.rotation})">
           <text class="piece-title" y="${-line * 0.6}">${esc(piece.title)}</text>
-          ${piece.cutting.map((c, i) => `<text class="piece-cut" y="${line * (0.6 + i)}">${esc(c)}</text>`).join('')}
+          ${[...piece.cutting, piece.size].map((c, i) => `<text class="piece-cut" y="${line * (0.6 + i)}">${esc(c)}</text>`).join('')}
         </g>`;
       return `<g transform="translate(${x} ${y})">
         <path class="cut-fill" d="${path(piece.cut, true)}"/>
