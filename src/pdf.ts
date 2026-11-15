@@ -85,7 +85,7 @@ function drawPiece(doc: jsPDF, piece: Piece, toMm: ToMm) {
   const angle = piece.rotation;
   const line = labelPt * 0.0353 * 1.3; // line height in cm
   centredText(doc, piece.title, along(piece.labelAt, angle, 0, -line * 0.6), angle, labelPt + 2, 'bold', toMm);
-  piece.cutting.forEach((text, i) =>
+  [...piece.cutting, piece.size].forEach((text, i) =>
     centredText(doc, text, along(piece.labelAt, angle, 0, line * (0.6 + i)), angle, labelPt, 'normal', toMm),
   );
 }
@@ -240,8 +240,9 @@ function infoPage(doc: jsPDF, pattern: Pattern, layout: Layout, page: PageSize) 
     doc.setFont('helvetica', 'bold');
     doc.text(piece.title, left, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(piece.cutting.join(', '), left + 35, y);
-    y += 5;
+    const lines: string[] = doc.splitTextToSize(piece.cutting.join(', '), right - left - 35);
+    doc.text(lines, left + 35, y);
+    y += 5 * lines.length;
   }
   y += 4;
 

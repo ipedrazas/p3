@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { assemblySteps } from './instructions';
 import {
   buildPattern,
+  sizeLabel,
   CUFF_TURN_OF_CLOTH,
   DEFAULTS,
   type Params,
@@ -114,6 +115,15 @@ describe('faceted cover', () => {
   });
   it('cuff top matches side top', () => {
     expect(piece(p, 'cuff').edges.top).toBeCloseTo(piece(p, 'side').edges.top, 6);
+  });
+});
+
+describe('size label', () => {
+  it('is printed on every piece', () => {
+    const p = { ...DEFAULTS, top: 15, base: 12.25, height: 14, measure: 'diameter' as const };
+    const { pieces } = buildPattern(p);
+    expect(pieces.every((pc) => pc.size === 'Pot Ø 15 / 12.3, H 14 cm')).toBe(true);
+    expect(sizeLabel({ ...p, measure: 'radius' })).toBe('Pot R 15 / 12.3, H 14 cm');
   });
 });
 

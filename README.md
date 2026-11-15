@@ -36,7 +36,7 @@ The pattern has these pieces:
 
 Round covers with fewer than 4 panels have long curved seams. Their edges get extra matching notches, one about every eighth of the way round, so the cuff, side panels and base line up.
 
-You cut each piece in outer fabric and again in lining. Every piece includes the seam allowance and has notches and a grainline arrow. On pieces cut on the fold, the grainline runs parallel to the fold.
+You cut each piece in outer fabric and again in lining. The side panels and base are also cut in interfacing, which is fused to the outer fabric so the cover stands up on its own. Every piece includes the seam allowance and has notches and a grainline arrow. Each one is also labelled with the pot size (top / base, height), so printed pieces from different patterns can be told apart. On pieces cut on the fold, the grainline runs parallel to the fold.
 
 The PDF contains:
 

@@ -16,10 +16,12 @@ export function assemblySteps(pattern: Pattern): Step[] {
       ? 'Fold the outer side panel right sides together and sew the side seam to make a tube.'
       : `Sew the ${n} outer side panels together along their side seams, right sides facing, to make a tube.`;
   const steps: (string | Step)[] = [
-    `All pieces include a ${sa} seam allowance: sew along the dashed line. Snip the notches about 5 mm into the seam allowance and mark the cuff edge line.` +
+    `All pieces include a ${sa} seam allowance: sew along the dashed line. Snip the notches about 5 mm into the seam allowance and mark the cuff edge line. Each piece is labelled with the pot size it was made for (top / base, height), so pieces from different patterns do not get mixed up.` +
       (extraNotches
         ? ' The long curved edges have extra notches, spaced evenly, so the cuff, side panels and base line up all the way round.'
         : ''),
+    'Interfacing gives the cover its body: without it the walls flop. Fuse (or baste) the interfacing to the wrong side of every outer side panel and the outer base before sewing anything. To keep the seams from getting bulky, trim the seam allowance off the interfacing first. Use a firm, heavy-weight interfacing' +
+      (fold > 0 ? '; for a light cuff fabric, interface the cuff panels as well.' : '.'),
     join,
     'Pin the outer base to the bottom of the tube, right sides together, matching the notches on the base to the side seams and the notches on the panels. Sew, then clip the curved seam allowance.',
     `Make the lining the same way, but leave a 10 cm gap in one side seam for turning.`,
